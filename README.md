@@ -34,3 +34,11 @@ This project is licensed under the [GNU General Public License](LICENSE) - see t
 ⚠️ Disclaimer
 -------------
 All this material and related videos are for educational and entertainment purposes only. It is not financial advice nor an endorsement of any provider, product or service. The user bears sole responsibility for any actions taken based on this information, and Robot Traders and its affiliates will not be held liable for any losses or damages resulting from its use. 
+
+spoonbill@imac:~/Documents/RobotTraders/CryptoStrategyLab$ git remote -v
+origin	https://github.com/hawsktf/CryptoStrategyLab.git (fetch)
+origin	https://github.com/hawsktf/CryptoStrategyLab.git (push)
+spoonbill@imac:~/Documents/RobotTraders/CryptoStrategyLab$ ssh -T git@github.com
+Hi hawsktf! You've successfully authenticated, but GitHub does not provide shell access.
+spoonbill@imac:~/Documents/RobotTraders/CryptoStrategyLab$ git remote set-url origin git@github.com:hawsktf/CryptoStrategyLab.git
+
