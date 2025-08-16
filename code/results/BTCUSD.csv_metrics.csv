@@ -1,0 +1,43 @@
+Metric,Value
+Period Start,2025-01-01 00:00:00
+Period End,2025-04-04 00:00:00
+Initial balance ($),1000.0
+Final balance ($),1091.97
+Performance (%),9.2
+Hodl performance (%),-11.31
+Performance / Hodl (%),23.13
+Total trades,7
+Time in position (%),21.51
+Win rate (%),85.71
+Max drawdown (trades) (%),-0.06
+Max drawdown (equity) (%),-2.71
+Profit factor,136.69
+Return / Max drawdown,3.39
+Sharpe ratio,3.4
+Sortino ratio,3.76
+Calmar ratio,12.94
+Average net PnL (%),3.96
+Average trades/day,0.074
+Average trade duration,2 days 20:34:17.142857142
+Best trade (%),7.35
+Best trade open,2025-03-03 00:00:00
+Best trade close,2025-03-04 00:00:00
+Worst trade (%),-0.1
+Worst trade open,2025-02-25 00:00:00
+Worst trade close,2025-03-02 00:00:00
+Total winning trades,6
+Total losing trades,1
+Average PnL winning trades (%),4.63
+Average PnL losing trades (%),-0.1
+Mean winning trade duration,2 days 12:00:00
+Mean losing trade duration,5 days 00:00:00
+Max win streak,4
+Max lose streak,1
+Total fees,2.19
+Biggest fee,0.53
+Average fee,0.31
+Open reason: Open long 1,3
+Open reason: Open short 1,3
+Open reason: Open long 2,1
+Close reason: Exit long,4
+Close reason: Exit short,3

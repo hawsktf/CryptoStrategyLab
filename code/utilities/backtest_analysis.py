@@ -1,9 +1,14 @@
 import pandas as pd
 import io
-import datetime
+from datetime import datetime, date
 import matplotlib.pyplot as plt
 from lightweight_charts import JupyterChart
 from typing import Optional
+import csv
+import os
+import sys
+sys.path.append('./config')
+import config
 
 class BacktestAnalysis:
 
@@ -11,12 +16,13 @@ class BacktestAnalysis:
         self.data = strategy.data.copy()
         self.trades = strategy.trades_info.copy()
         self.wallet = strategy.equity_record.copy()
-
+        '''
         if self.trades.empty:
             raise ValueError('trades_info is empty, probably need to run the backtest first')
 
         if self.wallet.empty:
             raise ValueError('equity_record is empty, probably need to run the backtest first')
+        '''
 
         self.compute_metrics()
 
@@ -178,6 +184,81 @@ class BacktestAnalysis:
                 file.write(results)
         else:
             print(results)
+    
+    # Save results as a .csv
+    def save_metrics_as_csv(self, scenario) -> None:
+
+        self.scenario = scenario
+        self.strategy_id = scenario.strategy_id
+        
+        # Prepare metrics as a dictionary (column header: value)
+        metrics = {
+            "strategy_id": self.strategy_id,
+            "date_executed": datetime.now().isoformat(),
+            "Period Start": self.wallet.index[0],
+            "Period End": self.wallet.index[-1],
+            "Initial balance ($)": round(self.initial_balance, 2),
+            "Final balance ($)": round(self.final_balance, 2),
+            "Performance (%)": round(self.roi * 100, 2),
+            "Hodl performance (%)": round(self.hodl_pct * 100, 2),
+            "Performance / Hodl (%)": round(self.performance_vs_hodl * 100, 2),
+            "Total trades": self.total_trades,
+            "Time in position (%)": round(self.time_in_position_ratio * 100, 2),
+    
+            # Health
+            "Win rate (%)": round(self.global_win_rate * 100, 2),
+            "Max drawdown (trades) (%)": -round(self.max_drawdown_trades * 100, 2),
+            "Max drawdown (equity) (%)": -round(self.max_drawdown_equity * 100, 2),
+            "Profit factor": round(self.profit_factor, 2),
+            "Return / Max drawdown": round(self.return_over_max_drawdown, 2),
+            "Sharpe ratio": round(self.sharpe_ratio, 2),
+            "Sortino ratio": round(self.sortino_ratio, 2),
+            "Calmar ratio": round(self.calmar_ratio, 2),
+    
+            # Trades
+            "Average net PnL (%)": round(self.avg_pnl_pct, 2),
+            "Average trades/day": round(self.mean_trades_per_day, 3),
+            "Average trade duration": str(self.mean_trade_duration),
+            "Best trade (%)": round(self.best_trade['net_pnl_pct'], 2),
+            "Best trade open": str(self.best_trade['open_time']),
+            "Best trade close": str(self.best_trade['close_time']),
+            "Worst trade (%)": round(self.worst_trade['net_pnl_pct'], 2),
+            "Worst trade open": str(self.worst_trade['open_time']),
+            "Worst trade close": str(self.worst_trade['close_time']),
+            "Total winning trades": self.total_good_trades,
+            "Total losing trades": self.total_bad_trades,
+            "Avg PnL win trades (%)": round(self.avg_pnl_pct_good_trades, 2),
+            "Avg PnL lose trades (%)": round(self.avg_pnl_pct_bad_trades, 2),
+            "Mean win trade duration": str(self.mean_good_trades_duration),
+            "Mean lose trade duration": str(self.mean_bad_trades_duration),
+            "Max win streak": self.max_win_streak,
+            "Max lose streak": self.max_lose_streak,
+    
+            # Fees
+            "Total fees": self.total_fee,
+            "Biggest fee": self.biggest_fee,
+            "Average fee": self.avg_fee,
+        }
+    
+        # Add open and close reasons
+        open_reasons = self.trades["open_reason"].value_counts()
+        for reason, count in open_reasons.items():
+            metrics[f"Open reason: {reason}"] = count
+    
+        close_reasons = self.trades["close_reason"].value_counts()
+        for reason, count in close_reasons.items():
+            metrics[f"Close reason: {reason}"] = count
+    
+        # Path to common results file
+        file_exists = os.path.isfile(config.RESULTS_FILEPATH)
+    
+        with open(config.RESULTS_FILEPATH, mode='a', newline='', encoding='utf-8') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=metrics.keys())
+    
+            if not file_exists:
+                writer.writeheader()
+    
+            writer.writerow(metrics)
 
 
 # --- Utilities ---
@@ -320,7 +401,7 @@ def plot_monthly_performance(equity_record: pd.DataFrame, year: int, path: Optio
 
         monthly_performances.append(monthly_performance)
 
-    months = [datetime.date(1900, month, 1).strftime('%B') for month in range(1, 13)]
+    months = [date(1900, month, 1).strftime('%B') for month in range(1, 13)]
 
     fig, ax = plt.subplots(figsize=config['fig_size'])
     bars = ax.bar(months, monthly_performances,

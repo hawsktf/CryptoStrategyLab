@@ -1,0 +1,10 @@
+id,strategy_id,symbol,timeframe,start_date,end_date,strategy_name,average_type,average_period,envelopes,stop_loss_pct,price_jump_pct,position_size_percentage,position_size_fixed_amount,fast_ma,slow_ma,signal_ma,initial_balance,leverage,open_fee_rate,close_fee_rate,mode,balance_fraction,trigger_price_delta,margin_mode,use_longs,use_shorts
+1,btc_sma_daily,BTC/USDT,1d,2025-01-01,,envelope,SMA,6,"[0.07, 0.11, 0.14]",0.3,,,1000,,,,1000,1,0.0002,0.0006,,,,,,
+2,eth_dcm_hourly,ETH/USDT:USDT,1h,2021-01-01,,envelope,DCM,5,"[0.07, 0.11, 0.14]",0.4,,100,,,,,1000,1,0.0002,0.0006,,,,,,
+3,ada_dcm_hourly,ADA/USDT:USDT,1h,2021-01-01,,envelope,DCM,5,"[0.07, 0.11, 0.14, 0.17]",0.4,0.3,100,,,,,1000,1,0.0002,0.0006,,,,,,
+4,avax_sma_hourly,AVAX/USDT:USDT,1h,2021-01-01,,envelope,SMA,5,"[0.1, 0.15, 0.2, 0.25]",0.4,0.3,100,,,,,1000,1,0.0002,0.0006,,,,,,
+5,sol_sma_hourly,SOL/USDT:USDT,1h,2021-01-01,,envelope,SMA,5,"[0.07, 0.11, 0.14, 0.17]",0.4,,100,,,,,1000,1,0.0002,0.0006,,,,,,
+6,link_sma_hourly,LINK/USDT:USDT,1h,,,envelope,SMA,5,"[0.1, 0.15, 0.2, 0.25]",0.4,0.2,100,,,,,1000,1,0.0002,0.0006,,,,,,
+7,btc_macd_daily,BTC/USDT,1d,2024-01-01,,MACDcross,MACD,,,0.3,,,1000,50,200,12,1000,1,0.0002,0.0006,,,,,,
+8,btc_macd_daily_full,BTC/USDT,1d,2017-01-01,,MACDcross,MACD,,,0.3,,,1000,50,200,12,1000,1,0.0002,0.0006,,,,,,
+9,dcm_hourly,USDT:USDT,1h,,,DCM,DCM,5,"[0.07, 0.11, 0.14]",0.4,0.3,,,,,,1000,1,0.0002,0.0006,,,0.005,isolated,TRUE,TRUE

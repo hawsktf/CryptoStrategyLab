@@ -4,58 +4,34 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
+import sys
+sys.path.append('./config')
+import config
 
-# Dictionary of supported exchanges
-EXCHANGES: Dict[str, Dict[str, Any]] = {
-    "bitget": {
-        "exchange_object": ccxt.bitget(config={'enableRateLimit': True}),
-        "limit_size_request": 200,
-    },
-    "binance": {
-        "exchange_object": ccxt.binance(config={'enableRateLimit': True}),
-        "limit_size_request": 1000,
-    },
-    "binanceusdm": {
-        "exchange_object": ccxt.binanceusdm(config={'enableRateLimit': True}),
-        "limit_size_request": 1000
-    },
-}
+#from config import EXCHANGES, TIMEFRAMES, BASE_DATA_PATH, ALPACA_API_KEY, ALPACA_SECRET_KEY
+from alpaca_trade_api.rest import REST, TimeFrame
 
-# Dictionary  supported timeframes
-TIMEFRAMES: Dict[str, Dict[str, Any]] = {
-    "1m": {"timedelta": timedelta(minutes=1), "interval_ms": 60000},
-    "2m": {"timedelta": timedelta(minutes=2), "interval_ms": 120000},
-    "5m": {"timedelta": timedelta(minutes=5), "interval_ms": 300000},
-    "15m": {"timedelta": timedelta(minutes=15), "interval_ms": 900000},
-    "30m": {"timedelta": timedelta(minutes=30), "interval_ms": 1800000},
-    "1h": {"timedelta": timedelta(hours=1), "interval_ms": 3600000},
-    "2h": {"timedelta": timedelta(hours=2), "interval_ms": 7200000},
-    "4h": {"timedelta": timedelta(hours=4), "interval_ms": 14400000},
-    "12h": {"timedelta": timedelta(hours=12), "interval_ms": 43200000},
-    "1d": {"timedelta": timedelta(days=1), "interval_ms": 86400000},
-    "1w": {"timedelta": timedelta(weeks=1), "interval_ms": 604800000},
-    "1M": {"timedelta": timedelta(days=30), "interval_ms": 2629746000}
-}
-
+alpaca_rest = REST(config.ALPACA_API_KEY, config.ALPACA_SECRET_KEY, base_url="https://paper-api.alpaca.markets")
 
 class DataManager:
-    """
-    Manages downloading and loading OHLCV data for cryptocurrencies
-    across various exchanges using the CCXT library.
-    """
-
     def __init__(self, name: str, path: str = "../data") -> None:
         self.name = name
-        self.path = Path(__file__).parent.joinpath(path, name).resolve()
-        self.exchange = EXCHANGES[self.name]["exchange_object"]
+        self.path = Path(__file__).parent.joinpath(config.BASE_DATA_PATH).resolve()
+        if name != 'alpaca':
+            self.exchange = config.EXCHANGES[self.name]["exchange_object"]
         self._check_support()
         self._create_directory(self.path)
         self.markets = None
         self.available_symbols = None
 
+    def _check_support(self) -> None:
+        if self.name != 'alpaca' and self.name not in config.EXCHANGES:
+            raise ValueError(f"The exchange {self.name} is not supported.")
+
     def fetch_markets(self):
-        self.markets = self.exchange.load_markets()
-        self.available_symbols = list(self.markets.keys())
+        if self.name != 'alpaca':
+            self.markets = self.exchange.load_markets()
+            self.available_symbols = list(self.markets.keys())
 
     def fetch_symbol_markets_info(self, symbol: str) -> None:
         if not self.markets:
@@ -72,158 +48,172 @@ class DataManager:
 
     def download(self, symbol: str, timeframe: str, start_date: Optional[str] = None,
                  end_date: Optional[str] = None) -> None:
-        """
-        Downloads OHLCV data for a given symbol and timeframe, saving it to a CSV file.
-
-        :param symbol: Trading pair symbol (e.g., 'BTC/USDT').
-        :param timeframe: Timeframe for the OHLCV data.
-        :param start_date: Start date for the data in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS' format.
-        :param end_date: End date for the data in 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS' format.
-        """
-
-        if not self.markets:
+        if self.name != 'alpaca' and not self.markets:
             self.fetch_markets()
 
-        if symbol not in self.available_symbols:
-            raise ValueError(f"The trading pair {symbol} either does not exist on {self.name} or the format is wrong. "
-                             f"Check with a print('your Ohlcv instance'.available_symbols)")
+        if self.name != 'alpaca' and symbol not in self.available_symbols:
+            raise ValueError(f"The trading pair {symbol} either does not exist on {self.name} or the format is wrong.")
 
-        if timeframe not in TIMEFRAMES:
+        if timeframe not in config.TIMEFRAMES:
             raise ValueError(f"The timeframe {timeframe} is not supported.")
 
-        date_format = "%Y-%m-%d" if timeframe == '1d' else "%Y-%m-%d %H:%M:%S"
-        date_format_error_message = f"Dates need to be in the '{date_format}' format."
+        # Date format fallback
+        try:
+            if timeframe.endswith("d"):
+                start_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else datetime(2017, 1, 1)
+                end_date = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+            else:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S") if start_date else datetime(2017, 1, 1)
+                end_date = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S") if end_date else datetime.now()
+        except ValueError:
+            raise ValueError(f"Date format mismatch. Use '%%Y-%%m-%%d' for daily or '%%Y-%%m-%%d %%H:%%M:%%S' for intraday.")
 
-        if start_date is None:
-            start_date = datetime(2017, 1, 1, 0, 0, 0)
+        if self.name == 'alpaca':
+            tf = {
+                '1m': TimeFrame.Minute,
+                '5m': TimeFrame(5, TimeFrame.Unit.Minute),
+                '15m': TimeFrame(15, TimeFrame.Unit.Minute),
+                '1h': TimeFrame.Hour,
+                '1d': TimeFrame.Day
+            }.get(timeframe, TimeFrame.Day)
+
+            bars = alpaca_rest.get_crypto_bars(
+                symbol.replace('USDT', 'USD'),
+                timeframe=tf,
+                start=start_date.isoformat() + 'Z',
+                end=end_date.isoformat() + 'Z'
+            ).df
+
+            bars = bars.reset_index()
+            bars.rename(columns={'timestamp': 'date'}, inplace=True)
+            bars['date'] = pd.to_datetime(bars['date'], utc=True).dt.tz_localize(None)
+            ohlcv = bars[['date', 'open', 'high', 'low', 'close', 'volume']]
+            ohlcv.set_index('date', inplace=True)
         else:
-            try:
-                start_date = datetime.strptime(start_date, date_format)
-            except ValueError:
-                raise ValueError(date_format_error_message)
+            ohlcv_raw = self._get_ohlcv(symbol, timeframe, start_date, end_date)
+            ohlcv = pd.DataFrame(ohlcv_raw, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            ohlcv['date'] = pd.to_datetime(ohlcv['timestamp'], unit='ms')
+            ohlcv = ohlcv[ohlcv['date'].notna()]
+            ohlcv['close'] = pd.to_numeric(ohlcv['close'], errors='coerce')
+            ohlcv = ohlcv[ohlcv['close'].notna()]
+            ohlcv.set_index('date', inplace=True)
+            ohlcv = ohlcv[~ohlcv.index.duplicated(keep='first')]
+            del ohlcv['timestamp']
+            ohlcv = ohlcv.sort_index()
+            ohlcv = ohlcv.iloc[:-1]
 
-        if end_date is None:
-            end_date = datetime.now()
-        else:
-            try:
-                end_date = datetime.strptime(end_date, date_format)
-            except ValueError:
-                raise ValueError(date_format_error_message)
-
-        ohlcv = self._get_ohlcv(symbol, timeframe, start_date, end_date)
-        ohlcv = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        ohlcv['date'] = pd.to_datetime(ohlcv['timestamp'], unit='ms')
-        ohlcv.set_index('date', inplace=True)
-        ohlcv = ohlcv[~ohlcv.index.duplicated(keep='first')]
-        del ohlcv['timestamp']
-        ohlcv = ohlcv.iloc[:-1]
-        file_path = self._get_csv_file_path(symbol, timeframe)
-        ohlcv.to_csv(file_path, header=True, index=True)
+        ohlcv = ohlcv.sort_index()
+        ohlcv = self.fundamentals(ohlcv)
+        self.save_to_master_db(ohlcv, symbol, timeframe)
 
     def load(self, symbol: str, timeframe: str, start_date: Optional[str] = None,
              end_date: Optional[str] = None) -> pd.DataFrame:
-        """
-        Loads OHLCV data from a CSV file for a given symbol and timeframe, optionally filtering by date range.
-
-        :param symbol: Trading pair symbol.
-        :param timeframe: Timeframe for the OHLCV data.
-        :param start_date: Optional start date for filtering the data.
-        :param end_date: Optional end date for filtering the data.
-        :return: A pandas DataFrame containing the OHLCV data.
-        """
-
-        file_path = self._get_csv_file_path(symbol, timeframe)
-
+        file_path = self.path.joinpath(timeframe, symbol.replace('/', '-').replace(':', '-') + ".csv")
         if not file_path.exists():
-            raise FileNotFoundError(
-                f"The data file for {symbol} in timeframe {timeframe} does not exist. Please run .download() first.")
-        ohlcv_df = pd.read_csv(file_path, header=0, parse_dates=['date'], index_col='date')
+            raise FileNotFoundError(f"No data found at {file_path}. Please run .download() first.")
 
-        if ohlcv_df.empty:
-            raise ValueError(f"The data file for {symbol} in timeframe {timeframe} is empty.")
+        df = pd.read_csv(file_path, parse_dates=['date'])
+        df.columns = df.columns.str.strip()
 
-        if not start_date:
-            start_date_dt = ohlcv_df.index.min()
+        if start_date:
+            start_date_dt = pd.to_datetime(start_date)
+            df = df[df['date'] >= start_date_dt]
+        if end_date:
+            end_date_dt = pd.to_datetime(end_date)
+            df = df[df['date'] <= end_date_dt]
+
+        df.set_index('date', inplace=True)
+        df.sort_index(inplace=True)
+        return df
+
+    def fundamentals(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df = df.sort_index()
+
+        for window in [20, 50, 200]:
+            df[f'sma_{window}'] = df['close'].rolling(window=window).mean()
+            df[f'ema_{window}'] = df['close'].ewm(span=window, adjust=False).mean()
+
+        df['ema_12'] = df['close'].ewm(span=12, adjust=False).mean()
+        df['ema_26'] = df['close'].ewm(span=26, adjust=False).mean()
+        df['macd'] = df['ema_12'] - df['ema_26']
+        df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['rsi'] = 100 - (100 / (1 + rs))
+
+        df['bb_middle'] = df['close'].rolling(window=20).mean()
+        df['bb_std'] = df['close'].rolling(window=20).std()
+        df['bb_upper'] = df['bb_middle'] + (2 * df['bb_std'])
+        df['bb_lower'] = df['bb_middle'] - (2 * df['bb_std'])
+
+        df['bullish'] = df['close'] > df['sma_200']
+        df['candle_color'] = ['green' if c > o else 'red' for c, o in zip(df['close'], df['open'])]
+        df['candle_streak_count'] = df['candle_color'].ne(df['candle_color'].shift()).cumsum()
+        df['candle_streak_count'] = df.groupby('candle_streak_count').cumcount() + 1
+
+        def determine_trend(row):
+            if row['close'] > row['sma_200'] and row['ema_12'] > row['ema_26']:
+                return 'uptrend'
+            elif row['close'] < row['sma_200'] and row['ema_12'] < row['ema_26']:
+                return 'downtrend'
+            else:
+                return 'sideways'
+
+        df['trend'] = df.apply(determine_trend, axis=1)
+        return df
+
+    def save_to_master_db(self, df: pd.DataFrame, symbol: str, timeframe: str):
+        folder_path = self.path.joinpath(timeframe)
+        folder_path.mkdir(parents=True, exist_ok=True)
+
+        filename = symbol.replace('/', '-').replace(':', '-') + ".csv"
+        file_path = folder_path.joinpath(filename)
+
+        df = df.copy()
+        df['exchange'] = self.name
+        df['pair'] = symbol
+        df['timeframe'] = timeframe
+        df['date_downloaded'] = datetime.now()
+        df.reset_index(inplace=True)
+
+        if file_path.exists():
+            existing_df = pd.read_csv(file_path, parse_dates=['date'])
+            combined_df = pd.concat([existing_df, df], ignore_index=True)
+            combined_df.drop_duplicates(subset=['pair', 'timeframe', 'date'], keep='last', inplace=True)
         else:
-            start_date_dt = self._validate_date_format(start_date, timeframe)
-        if not end_date:
-            end_date_dt = ohlcv_df.index.max()
-        else:
-            end_date_dt = self._validate_date_format(end_date, timeframe)
+            combined_df = df
 
-        if start_date_dt < ohlcv_df.index.min() or end_date_dt > ohlcv_df.index.max():
-            raise ValueError(
-                "The requested date range is not fully covered by the available data. "
-                "Please adjust your dates or run .download() to update the data file.")
+        combined_df['date'] = pd.to_datetime(combined_df['date'], errors='coerce', utc=True).dt.tz_localize(None)
+        numeric_cols = combined_df.select_dtypes(include=['float64', 'float32', 'int']).columns
+        combined_df[numeric_cols] = combined_df[numeric_cols].round(2)
+        combined_df.sort_values(by='date', inplace=True)
+        combined_df.to_csv(file_path, index=False)
+        print(f"Saved {len(df)} new rows to {file_path.name}")
 
-        return ohlcv_df.loc[start_date_dt:end_date_dt]
-
-    def _check_support(self) -> None:
-        if self.name not in EXCHANGES:
-            raise ValueError(f"The exchange {self.name} is not supported.")
-
-    @staticmethod
-    def _create_directory(path: Path) -> None:
+    def _create_directory(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
-
-    def _get_csv_file_path(self, symbol: str, timeframe: str) -> Path:
-        timeframe_path = self.path.joinpath(timeframe)
-        self._create_directory(timeframe_path)
-        file_name = f"{symbol.replace('/', '-').replace(':', '-')}.csv"
-        return timeframe_path.joinpath(file_name)
-
-    @staticmethod
-    def _validate_date_format(date: Optional[str], timeframe: str) -> datetime:
-        date_format = "%Y-%m-%d" if timeframe == '1d' else "%Y-%m-%d %H:%M:%S"
-
-        try:
-            return datetime.strptime(date, date_format)
-
-        except ValueError:
-            raise ValueError(f"The date '{date}' does not match the expected format '{date_format}'.")
 
     def _get_ohlcv(self, symbol: str, timeframe: str, start_date: datetime, end_date: datetime) -> List[List[Any]]:
         current_date_ms = int(start_date.timestamp() * 1000)
         end_date_ms = int(end_date.timestamp() * 1000)
         ohlcv = []
 
-        if self.name == 'bitget':
-            if ":" not in symbol:
-                raise ValueError("Bitget Spot data not supported")
-
-            while current_date_ms < end_date_ms:
-                fetched_data = self.exchange.fetch_ohlcv(
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    limit=EXCHANGES[self.name]["limit_size_request"],
-                    params={
-                        "method": "publicMixGetV2MixMarketHistoryCandles",
-                        "until": current_date_ms + TIMEFRAMES[timeframe]["interval_ms"] * EXCHANGES[self.name]["limit_size_request"],
-                    }
-                )
-
-                if fetched_data:
-                    ohlcv.extend(fetched_data)
-                    print(f"fetched ohlcv data for {symbol} from {datetime.fromtimestamp(current_date_ms / 1000).strftime("%Y-%m-%d %H:%M:%S")}")
-                else:
-                    print(f"fetched ohlcv data for {symbol} from {datetime.fromtimestamp(current_date_ms / 1000).strftime("%Y-%m-%d %H:%M:%S")} (empty)")
-
-                current_date_ms = min([current_date_ms + int(0.5*TIMEFRAMES[timeframe]["interval_ms"] * EXCHANGES[self.name]["limit_size_request"]), end_date_ms])
-
-        else:
-            while current_date_ms < end_date_ms:
-                fetched_data = self.exchange.fetch_ohlcv(
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    since=current_date_ms,
-                    limit=EXCHANGES[self.name]["limit_size_request"]
-                )
-                if fetched_data:
-                    ohlcv.extend(fetched_data)
-                    current_date_ms = fetched_data[-1][0] + 1
-                    print(f"fetched ohlcv data for {symbol} from {datetime.fromtimestamp(current_date_ms / 1000).strftime("%Y-%m-%d %H:%M:%S")}")
-                else:
-                    break
-
+        while current_date_ms < end_date_ms:
+            fetched_data = self.exchange.fetch_ohlcv(
+                symbol=symbol,
+                timeframe=timeframe,
+                since=current_date_ms,
+                limit=config.EXCHANGES[self.name]["limit_size_request"]
+            )
+            if fetched_data:
+                ohlcv.extend(fetched_data)
+                current_date_ms = fetched_data[-1][0] + 1
+                print(f"fetched {self.name} ohlcv data for {symbol} from {datetime.fromtimestamp(current_date_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')}")
+            else:
+                break
 
         return ohlcv

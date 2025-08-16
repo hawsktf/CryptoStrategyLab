@@ -1,0 +1,47 @@
+--- General ---
+Period: [2025-01-01 00:00:00] -> [2025-04-04 00:00:00]
+Initial balance: 1000.0 $
+Final balance: 1091.97 $
+Performance: 9.2 %
+Hodl performance: -11.31%
+Performance/Hodl: 23.13 %
+Total trades: 7
+Time in position: 21.51 %
+
+--- Health ---
+Win rate: 85.71 %
+Max drawdown at trade close: -0.06 %
+Max drawdown at equity update: -2.71 %
+Profit factor: 136.69
+Return over max drawdown: 3.39
+Sharpe ratio: 3.4
+Sortino ratio: 3.76
+Calmar ratio: 12.94
+
+--- Trades ---
+Average net PnL: 3.96 %
+Average trades per day: 0.074
+Average trades duration: 2 days 20:34:17.142857142
+Best trade: +7.35 % entered 2025-03-03 00:00:00 exited 2025-03-04 00:00:00
+Worst trade: -0.1 % entered 2025-02-25 00:00:00 exited 2025-03-02 00:00:00
+Total winning trades: 6
+Total loosing trades: 1
+Average net PnL winning trades: 4.63 %
+Average net PnL loosing trades: -0.1 %
+Mean winning trades duration: 2 days 12:00:00
+Mean loosing trades duration: 5 days 00:00:00
+Max win streak: 4
+Max lose streak: 1
+Open reasons:
+Open long 1     3
+Open short 1    3
+Open long 2     1
+Close reasons:
+Exit long     4
+Exit short    3
+
+--- Fees in Quote ---
+Total: 2.19
+Biggest: 0.53
+Average: 0.31
+
